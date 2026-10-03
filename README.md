@@ -87,8 +87,8 @@ python -m retail_flow.cli benchmark --root data/benchmark --date 2026-10-01 --ro
 Alert records remain local; no email, Slack or webhook is sent. Freshness checks
 return a failing exit code for a missing/stale ledger. Benchmark output records
 actual elapsed time, row counts, output bytes, runtime and worker configuration.
-See [measured results](docs/benchmarks.md). Small local runs do not substantiate
-50M monthly production throughput or a four-hour SLA.
+See [measured results](docs/benchmarks.md) for workload size, runtime and
+configuration.
 
 ## Azure
 
@@ -102,8 +102,8 @@ has not been performed here; no Azure resources are created by local commands.
 
 - [Architecture](docs/architecture.md) · [Contracts](docs/contracts.md)
 - [Operations](docs/runbook.md) · [Security](docs/security.md)
-- [Validation](docs/validation.md) · [Resume alignment](docs/resume-alignment.md)
+- [Validation](docs/validation.md) · [Engineering coverage](docs/resume-alignment.md)
 - [Hands-on walkthrough](docs/walkthrough.md) · [Month-end SQL](sql/month_end.sql)
 
-All source data and accounting policies are synthetic. Historical employer
-volume and savings figures remain separate from this project's measured results.
+Uses synthetic retail data, with reproducible tests and documented benchmark
+results.

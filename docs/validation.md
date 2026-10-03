@@ -17,14 +17,18 @@ preview commands were exercised. See benchmarks.md for actual measurements.
 GitHub Actions checks shared tests, Parquet and Delta execution, health/retention,
 a 10,000-record benchmark, Compose syntax, both container builds, all three DAG
 imports, standalone pipeline/Airflow execution and the full PostgreSQL/Airflow
-Compose deployment plus a DAG run. Publication of the release was blocked by automatic approval review pending
-explicit authorization to upload to the public repository. These new CI checks
-are prepared and have not run for version 0.2.0. The earlier version had green
-CI, including Delta and standalone containers; that result does not validate
-this expanded release.
+Compose deployment plus a DAG run. All release checks passed on October 3, 2026:
+13 tests, Parquet/Delta execution, health/retention, benchmark, both images,
+three DAG imports, standalone execution, full Compose startup, PostgreSQL-backed
+Airflow DAG execution and the final ledger health check.
+
+[Release CI](https://github.com/syeddabeer02-cmd/consumer-retail-data-flow-platform/actions/runs/37154480198)
+validates code commit 097018a81162c03824c3fe61bb3d14306e64e157. Subsequent changes
+to the validation record and public wording are documentation-only.
+
 
 Local Delta downloads remain blocked by Maven hostname resolution in this Work
-runtime; the earlier build successfully exercised Delta on GitHub CI. Docker is
+runtime; the expanded release successfully exercised Delta on GitHub CI. Docker is
 not installed locally, so container/Compose verification runs through CI.
 Azure Databricks/ADLS deployment and the user's own Windows installation require
 those environments and have not been accessed here. Cloud configuration uses

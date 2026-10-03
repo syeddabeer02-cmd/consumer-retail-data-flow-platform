@@ -166,7 +166,7 @@ def reconcile(expected, payouts, tolerance="0.01"):
         & (F.col("currency") == F.col("original_currency"))
         & (F.col("amount") == -F.col("original_amount"))
         & (F.col("event_date") == F.col("original_date"))
-        & (F.col("amount") < 0)
+        & (F.col("amount") != 0)
         & (F.col("original_reversal").isNull() | (F.col("original_reversal") == ""))
     )
     linked = linked.withColumn(
@@ -195,7 +195,7 @@ def reconcile(expected, payouts, tolerance="0.01"):
         "_positive_count", F.sum(F.when(eligible & (F.col("amount") > 0), 1).otherwise(0)).over(pair_group)
     )
     linked = linked.withColumn(
-        "_negative_count", F.sum(F.when(eligible & (F.col("amount") < 0), 1).otherwise(0)).over(pair_group)
+        "_negative_count", F.sum(F.when(eligible & (F.col("amount") != 0), 1).otherwise(0)).over(pair_group)
     )
     linked = linked.withColumn("_pair_rank", F.row_number().over(pair_order))
     paired = eligible & (F.col("_pair_rank") <= F.least("_positive_count", "_negative_count"))

@@ -36,6 +36,7 @@ def test_reconciliation_and_bad_reversal(spark):
             ("F1", "V1", "INR", "2026-10-01", Decimal("10.00")),
             ("F2", "V1", "INR", "2026-10-01", Decimal("10.00")),
             ("F3", "V1", "INR", "2026-10-01", Decimal("10.00")),
+            ("F5", "V1", "INR", "2026-10-01", Decimal("-10.00")),
         ],
         "record_id string, vendor_id string, currency string, event_date string, net_payable decimal(20,2)",
     )
@@ -45,6 +46,8 @@ def test_reconciliation_and_bad_reversal(spark):
             ("R1", "F1", "V1", "INR", "2026-10-01", "-10", "P1"),
             ("R2", "F2", "V1", "INR", "2026-10-01", "-10", "MISSING"),
             ("P4", "F4", "V1", "INR", "2026-10-01", "10", ""),
+            ("P5", "F5", "V1", "INR", "2026-10-01", "-10", ""),
+            ("R5", "F5", "V1", "INR", "2026-10-01", "10", "P5"),
         ],
         "payout_id string, record_id string, vendor_id string, currency string, event_date string, amount string, reversal_of string",
     )
@@ -54,6 +57,7 @@ def test_reconciliation_and_bad_reversal(spark):
         "F2": "INVALID_REVERSAL",
         "F3": "MISSING_PAYOUT",
         "F4": "ORPHAN_PAYOUT",
+        "F5": "REVERSED",
     }
 
 

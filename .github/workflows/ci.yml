@@ -1,13 +1,15 @@
 name: Retail Data Platform CI
 on:
   push:
+    paths-ignore: ["docs/**", "README.md"]
   pull_request:
+    paths-ignore: ["docs/**", "README.md"]
 permissions:
   contents: read
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -37,9 +39,21 @@ jobs:
       - run: docker build -f infrastructure/Dockerfile.airflow -t retail-airflow:test .
       - run: >-
           docker run --rm --entrypoint python retail-airflow:test -c
-          "from airflow.models import DagBag; b = DagBag('/opt/airflow/dags', include_examples=False); assert not b.import_errors, b.import_errors; assert {'retail_funding_daily', 'retail_synthetic_demo'} <= set(b.dags)"
+          "from airflow.models import DagBag; b = DagBag('/opt/airflow/dags', include_examples=False); assert not b.import_errors, b.import_errors; assert {'retail_funding_daily', 'retail_synthetic_demo', 'retail_retention'} <= set(b.dags)"
       - run: docker run --rm retail-flow:test demo --date 2026-10-01 --rows 20
       - run: >-
           docker run --rm --entrypoint /bin/bash
           -e AIRFLOW__CORE__EXECUTOR=SequentialExecutor retail-airflow:test -c
           "airflow db migrate && airflow dags test retail_synthetic_demo 2026-10-01"
+      - run: python -m retail_flow.cli health
+      - run: python -m retail_flow.cli retain --days 30
+      - run: python -m retail_flow.cli benchmark --root data/ci-benchmark --date 2026-10-01 --rows 10000
+      - run: docker compose --env-file .env.example up -d --build --wait --wait-timeout 180 airflow-webserver airflow-scheduler
+      - run: docker compose --env-file .env.example exec -T airflow-scheduler airflow dags test retail_synthetic_demo 2026-10-01
+      - run: docker compose --env-file .env.example exec -T airflow-scheduler python -m retail_flow.cli health --root /opt/airflow/data
+      - name: Compose logs on failure
+        if: failure()
+        run: docker compose --env-file .env.example logs --tail 100
+      - name: Stop verification stack
+        if: always()
+        run: docker compose --env-file .env.example down

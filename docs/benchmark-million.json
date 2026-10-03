@@ -1,0 +1,41 @@
+{
+  "requested_funding_rows": 1000000,
+  "seed": 42,
+  "generation_seconds": 30.249,
+  "pipeline_seconds": 142.07,
+  "input_rows": 2100003,
+  "funding_rows_per_second": 7038.78,
+  "output_bytes": 271322033,
+  "cpu_count": 9,
+  "sampled_peak_process_tree_rss_bytes": null,
+  "memory_measurement": "Unavailable: original monitor used virtualized process IDs; incomplete sample discarded. Monitor now maps kernel IDs.",
+  "python": "3.12.14",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+  "master": "local[2]",
+  "format": "parquet",
+  "run_id": "7e71a80f783a4dd8878fe0e148ff82f5",
+  "quality": {
+    "funding": {
+      "input": 1000002,
+      "valid": 1000000,
+      "quarantined": 1,
+      "duplicate_versions": 1
+    },
+    "payouts": {
+      "input": 1100001,
+      "valid": 1100001,
+      "quarantined": 0,
+      "duplicate_versions": 0
+    }
+  },
+  "reconciliation": {
+    "AMOUNT_MISMATCH": 50000,
+    "MISSING_PAYOUT": 50000,
+    "REVERSED": 50000,
+    "MATCHED": 800000,
+    "CONTRA": 50000,
+    "ORPHAN_PAYOUT": 1
+  },
+  "note": "Measured on this runtime; not evidence of a 50M-record production SLA",
+  "discarded_namespace_rss_sample_bytes": 2125824
+}

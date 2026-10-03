@@ -28,7 +28,7 @@ Bundle deployment builds and uploads the wheel and Python job, and creates a job
 that uses the existing cluster. Delta tables are partitioned by batch date.
 Run the reporting SQL after selecting your catalog/schema. A success audit row
 publishes the new snapshot. Reruns retain historical physical rows but the current
-view selects one complete run per date, preventing duplicate report totals.
+view selects one latest complete historical as-of run, preventing cumulative snapshots from duplicating report totals.
 
 A dedicated cloud workspace/identity is compatible with project-only access.
 Do not grant access to unrelated accounts or storage. This repository neither
@@ -39,3 +39,15 @@ Official references:
 - https://learn.microsoft.com/en-us/azure/databricks/dev-tools/bundles/
 - https://learn.microsoft.com/en-us/azure/databricks/connect/unity-catalog/cloud-storage/azure-managed-identities
 - https://learn.microsoft.com/en-us/azure/databricks/volumes/
+
+Each cloud run reads all finalized raw date partitions through its as-of date.
+Shared quality gates run before Delta publication. Quality warnings/failures
+append to pipeline_alerts; job failures also remain in Databricks job logs.
+The bundle includes retail_retention as a dry-run maintenance job. Its --apply
+mode deletes superseded run rows older than the configured horizon while
+preserving the latest success per date; audit records stay intact. After a
+validated retention policy, use Delta VACUUM with its normal safety retention
+to reclaim physically obsolete files. The preview job never deletes data.
+Existing tables from the original daily-only schema should use a fresh target
+schema for this expanded snapshot schema; do not enable uncontrolled schema
+merge over an old accounting contract.

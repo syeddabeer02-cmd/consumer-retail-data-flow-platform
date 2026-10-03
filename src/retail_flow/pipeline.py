@@ -8,8 +8,9 @@ import uuid
 from datetime import date, datetime, timezone
 from pathlib import Path
 from pyspark.sql import SparkSession, functions as F
-from .transforms import validate, latest, funding, reconcile, vendor_summary
-from .synthetic import FUNDING_FIELDS, PAYOUT_FIELDS
+from .ledger import batches, assemble
+from .quality import QualityPolicy, enforce
+from .operations import atomic_json, alert
 from .finance import POLICY_VERSION
 
 
@@ -38,26 +39,32 @@ def spark_session(output_format="parquet", master=None):
     return spark
 
 
-def run(root, batch_date, output_format="parquet", master=None):
+def run(root, batch_date, output_format="parquet", master=None, quality_policy=None):
     date.fromisoformat(batch_date)
     if output_format not in {"parquet", "delta"}:
         raise ValueError("Output format must be parquet or delta")
     root = Path(root).resolve()
-    raw = root / "raw" / batch_date
+    partitions = batches(root, batch_date)
+    quality_policy = quality_policy or QualityPolicy()
     hashes = {}
-    for name in ["funding", "payouts"]:
-        path = raw / f"{name}.csv"
-        if not path.is_file():
-            raise FileNotFoundError(path)
-        h = hashlib.sha256()
-        with path.open("rb") as handle:
-            for block in iter(lambda: handle.read(1024 * 1024), b""):
-                h.update(block)
-        hashes[name] = h.hexdigest()
+    for folder in partitions:
+        for name in ["funding", "payouts"]:
+            path = folder / f"{name}.csv"
+            h = hashlib.sha256()
+            with path.open("rb") as handle:
+                for block in iter(lambda: handle.read(1024 * 1024), b""):
+                    h.update(block)
+            hashes[f"{folder.name}/{name}"] = h.hexdigest()
     publish = root / "published" / batch_date
     publish.mkdir(parents=True, exist_ok=True)
-    lock = publish / ".lock"
+    lock = root / ".ledger-lock"
     lock.mkdir()  # Fail immediately if another process owns this date.
+    global_pointer = root / "published" / "CURRENT_LEDGER.json"
+    if global_pointer.exists() and json.loads(global_pointer.read_text())["batch_date"] > batch_date:
+        lock.rmdir()
+        raise ValueError(
+            "Reprocess corrections at the latest published as-of date; backwards publication is blocked"
+        )
     run_id = uuid.uuid4().hex
     destination = root / "runs" / batch_date / run_id
     destination.mkdir(parents=True)
@@ -66,54 +73,9 @@ def run(root, batch_date, output_format="parquet", master=None):
     cached = []
     try:
         spark = spark_session(output_format, master)
-        inputs, metrics, quarantines = {}, {}, []
-        for name, fields in [("funding", FUNDING_FIELDS), ("payouts", PAYOUT_FIELDS)]:
-            source = (
-                spark.read.option("header", True).option("mode", "FAILFAST").csv(str(raw / f"{name}.csv"))
-            )
-            if source.columns != fields:
-                raise ValueError(f"{name}: schema/header does not match the contract")
-            source = source.withColumn("source_file", F.input_file_name()).cache()
-            cached.append(source)
-            good, bad = validate(source, name, batch_date)
-            key = "record_id" if name == "funding" else "payout_id"
-            clean = latest(good, key).cache()
-            cached.append(clean)
-            raw_count, good_count, clean_count, bad_count = (
-                source.count(),
-                good.count(),
-                clean.count(),
-                bad.count(),
-            )
-            metrics[name] = dict(
-                input=raw_count,
-                valid=clean_count,
-                quarantined=bad_count,
-                duplicate_versions=good_count - clean_count,
-            )
-            # Union heterogeneous rejected records as JSON, retaining error and lineage.
-            quarantines.append(
-                bad.select(
-                    F.lit(name).alias("source_type"),
-                    "quality_errors",
-                    "source_file",
-                    F.to_json(F.struct(*[F.col(c) for c in fields])).alias("raw_record"),
-                )
-            )
-            inputs[name] = clean
-        calculated = funding(inputs["funding"]).cache()
-        cached.append(calculated)
-        reconciled = reconcile(calculated, inputs["payouts"]).cache()
-        cached.append(reconciled)
-        datasets = {
-            "silver_funding": inputs["funding"],
-            "silver_payouts": inputs["payouts"],
-            "gold_funding": calculated,
-            "gold_reconciliation": reconciled,
-            "gold_vendor_summary": vendor_summary(reconciled),
-            "exceptions": reconciled.filter(F.col("status") != "MATCHED"),
-            "quarantine": quarantines[0].unionByName(quarantines[1]),
-        }
+        datasets, metrics, cached = assemble(spark, partitions)
+        gates = enforce(datasets, metrics, quality_policy)
+        reconciled = datasets["gold_reconciliation"]
         output_counts = {}
         for name, df in datasets.items():
             enriched = df.withColumn("run_id", F.lit(run_id)).withColumn(
@@ -137,16 +99,40 @@ def run(root, batch_date, output_format="parquet", master=None):
             quality=metrics,
             output_counts=output_counts,
             reconciliation=statuses,
+            snapshot_mode="historical_as_of",
+            source_partitions=[p.name for p in partitions],
+            quality_gates=gates,
         )
+        for folder in partitions:
+            for name in ["funding", "payouts"]:
+                h = hashlib.sha256()
+                with (folder / f"{name}.csv").open("rb") as handle:
+                    for block in iter(lambda: handle.read(1024 * 1024), b""):
+                        h.update(block)
+                if h.hexdigest() != hashes[f"{folder.name}/{name}"]:
+                    raise RuntimeError("Input changed during execution; publication refused")
         (destination / "manifest.json").write_text(json.dumps(manifest, indent=2))
-        temporary = publish / f"{run_id}.json"
-        temporary.write_text(json.dumps(manifest, indent=2))
-        os.replace(temporary, publish / "CURRENT.json")
+        if sum(m["quarantined"] for m in metrics.values()) or gates["exception_ratio"]:
+            alert(
+                root,
+                "WARNING",
+                "QUALITY_EXCEPTIONS",
+                {
+                    "run_id": run_id,
+                    "as_of": batch_date,
+                    "quality": metrics,
+                    "exception_ratio": gates["exception_ratio"],
+                },
+            )
+        # No fallible data writes after the authoritative global commit.
+        atomic_json(publish / "CURRENT.json", manifest)
+        atomic_json(global_pointer, manifest)
         return manifest
     except Exception as error:
         (destination / "failure.json").write_text(
             json.dumps({"run_id": run_id, "status": "FAILED", "error": str(error)})
         )
+        alert(root, "ERROR", "PIPELINE_FAILED", {"run_id": run_id, "as_of": batch_date, "error": str(error)})
         raise
     finally:
         for df in cached:

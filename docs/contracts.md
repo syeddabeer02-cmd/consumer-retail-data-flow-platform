@@ -19,10 +19,14 @@ to two decimals. The 35 measures in `finance.py` and `transforms.py` include
 component amounts, per-unit values, effective percentages and subtotals. They
 are illustrative financial calculations, not copied employer policy.
 
-A batch is a complete daily snapshot. Corrections and late versions require
-reprocessing their original event-date batch. Cross-date payout settlement and
-cross-date reversal resolution are outside this daily contract. They require a
-historical ledger and are not silently matched by this job.
+Each raw partition is a complete event-date snapshot. Every published run is a
+historical as-of ledger built from all partitions through its date. Funding
+record IDs and payout IDs must be globally unique logical keys; version updates
+reuse the same ID with a newer updated_at timestamp. Late settlements and
+reversals can refer to records from earlier partitions. Corrections rebuild the
+latest as-of snapshot. Duplicate versions resolve globally, not separately per day.
+The original funding date remains the accounting date; first/last settlement
+dates describe bank arrival. A reversal cannot precede its original payout.
 
 Reconciliation status precedence:
 
@@ -37,9 +41,10 @@ Reconciliation status precedence:
 | AMOUNT_MISMATCH | Remaining difference |
 
 A reversal must reference a non-reversal payout and negate its exact amount with
-matching record, vendor, date and currency. Multiple reversal references to one
+matching record, vendor and currency; the reversal date must be on or after
+the original payout date. Multiple reversal references to one
 original are invalid. Unreferenced opposing amounts match one-to-one within the
-same record/vendor/date/currency; originals with referenced reversals cannot
+same record/vendor/currency across the as-of history; originals with referenced reversals cannot
 also match as contra. Pair hashes are retained in reconciliation lineage. Reversed records remain in exceptions so
 an operator can decide whether a replacement payout is due. Ordinary split
 payouts aggregate to one reconciliation record. Gold vendor summary groups by

@@ -105,3 +105,42 @@ def test_precision_and_quantity_contract(spark, tmp_path):
     good, bad = validate(spark.createDataFrame(rows), "funding", "2026-10-01")
     assert good.select("record_id").first().record_id == "VALID"
     assert {r.record_id for r in bad.select("record_id").collect()} == {"CENT", "BIG", "RATE"}
+
+
+def test_cross_date_settlement_reversal_and_contra(spark):
+    expected = spark.createDataFrame(
+        [(k, "V", "INR", "2026-09-30", Decimal("10.00")) for k in ["L", "R", "C"]],
+        "record_id string, vendor_id string, currency string, event_date string, net_payable decimal(20,2)",
+    )
+    payouts = spark.createDataFrame(
+        [
+            ("L1", "L", "V", "INR", "2026-10-01", "10", ""),
+            ("R1", "R", "V", "INR", "2026-09-30", "10", ""),
+            ("R2", "R", "V", "INR", "2026-10-02", "-10", "R1"),
+            ("C1", "C", "V", "INR", "2026-10-01", "10", ""),
+            ("C2", "C", "V", "INR", "2026-10-02", "-10", ""),
+        ],
+        "payout_id string, record_id string, vendor_id string, currency string, event_date string, amount string, reversal_of string",
+    )
+    rows = {r.record_id: r for r in reconcile(expected, payouts, cross_date=True).collect()}
+    assert {k: r.status for k, r in rows.items()} == {"L": "MATCHED", "R": "REVERSED", "C": "CONTRA"}
+    assert rows["L"].event_date == "2026-09-30"
+    assert rows["L"].last_settlement_date == "2026-10-01"
+    assert rows["L"].contra_pair_count == 0
+    assert rows["C"].contra_pair_count == 1
+
+
+def test_month_end_reconciles_later_payment_to_original_month(spark):
+    from retail_flow.transforms import month_end_summary
+
+    expected = spark.createDataFrame(
+        [("M", "V", "INR", "2026-09-30", Decimal("10.00"))],
+        "record_id string, vendor_id string, currency string, event_date string, net_payable decimal(20,2)",
+    )
+    payout = spark.createDataFrame(
+        [("M1", "M", "V", "INR", "2026-10-02", "10", "")],
+        "payout_id string, record_id string, vendor_id string, currency string, event_date string, amount string, reversal_of string",
+    )
+    row = month_end_summary(reconcile(expected, payout, cross_date=True)).first()
+    assert row.accounting_month == "2026-09" and row.status == "MATCHED"
+    assert row.record_count == 1 and row.paid_amount == Decimal("10.00")

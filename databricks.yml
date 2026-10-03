@@ -42,3 +42,19 @@ resources:
           max_retries: 2
           min_retry_interval_millis: 120000
           timeout_seconds: 14400
+    retail_retention:
+      name: consumer-retail-retention-preview
+      max_concurrent_runs: 1
+      timeout_seconds: 3600
+      tasks:
+        - task_key: preview_retention
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./databricks/maintenance.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}
+              - --days
+              - '30'

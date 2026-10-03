@@ -146,7 +146,7 @@ def funding(df):
     return df.withColumn("policy_version", F.lit(POLICY_VERSION))
 
 
-def reconcile(expected, payouts, tolerance="0.01"):
+def reconcile(expected, payouts, tolerance="0.01", cross_date=False):
     payouts = payouts.withColumn("amount", F.col("amount").cast(DECIMAL))
     original = payouts.select(
         F.col("payout_id").alias("original_id"),
@@ -169,6 +169,17 @@ def reconcile(expected, payouts, tolerance="0.01"):
         & (F.col("amount") != 0)
         & (F.col("original_reversal").isNull() | (F.col("original_reversal") == ""))
     )
+    if cross_date:
+        valid_link = (
+            F.col("original_id").isNotNull()
+            & (F.col("record_id") == F.col("original_record"))
+            & (F.col("vendor_id") == F.col("original_vendor"))
+            & (F.col("currency") == F.col("original_currency"))
+            & (F.col("amount") == -F.col("original_amount"))
+            & (F.col("amount") != 0)
+            & (F.col("event_date") >= F.col("original_date"))
+            & (F.col("original_reversal").isNull() | (F.col("original_reversal") == ""))
+        )
     linked = linked.withColumn(
         "reference_count", F.count("payout_id").over(Window.partitionBy("reversal_of"))
     )
@@ -185,7 +196,7 @@ def reconcile(expected, payouts, tolerance="0.01"):
     )
     linked = linked.join(referenced, linked.payout_id == referenced.referenced_id, "left")
     eligible = (~is_reversal) & F.col("referenced_id").isNull() & (F.col("amount") != 0)
-    group_keys = ["record_id", "vendor_id", "currency", "event_date"]
+    group_keys = ["record_id", "vendor_id", "currency"] + ([] if cross_date else ["event_date"])
     linked = linked.withColumn("_abs_amount", F.abs("amount")).withColumn("_sign", F.signum("amount"))
     pair_group = Window.partitionBy(*group_keys, "_abs_amount")
     pair_order = Window.partitionBy(*group_keys, "_abs_amount", "_sign").orderBy(
@@ -195,7 +206,7 @@ def reconcile(expected, payouts, tolerance="0.01"):
         "_positive_count", F.sum(F.when(eligible & (F.col("amount") > 0), 1).otherwise(0)).over(pair_group)
     )
     linked = linked.withColumn(
-        "_negative_count", F.sum(F.when(eligible & (F.col("amount") != 0), 1).otherwise(0)).over(pair_group)
+        "_negative_count", F.sum(F.when(eligible & (F.col("amount") < 0), 1).otherwise(0)).over(pair_group)
     )
     linked = linked.withColumn("_pair_rank", F.row_number().over(pair_order))
     paired = eligible & (F.col("_pair_rank") <= F.least("_positive_count", "_negative_count"))
@@ -203,7 +214,9 @@ def reconcile(expected, payouts, tolerance="0.01"):
         "contra_pair_id",
         F.when(paired, F.sha2(F.concat_ws("|", *group_keys, "_abs_amount", "_pair_rank"), 256)),
     )
-    actual = linked.groupBy("record_id", "vendor_id", "currency", "event_date").agg(
+    actual = linked.groupBy(*group_keys).agg(
+        F.min("event_date").alias("first_settlement_date"),
+        F.max("event_date").alias("last_settlement_date"),
         F.sum("amount").cast(DECIMAL).alias("paid_amount"),
         F.count("payout_id").alias("payout_count"),
         F.sum("invalid_reversal").alias("invalid_reversal_count"),
@@ -212,7 +225,9 @@ def reconcile(expected, payouts, tolerance="0.01"):
         F.sum(F.when(is_reversal, 1).otherwise(0)).alias("reversal_count"),
     )
     expected = expected.select("record_id", "vendor_id", "currency", "event_date", "net_payable")
-    result = expected.join(actual, ["record_id", "vendor_id", "currency", "event_date"], "full")
+    result = expected.join(actual, group_keys, "full")
+    if cross_date:
+        result = result.withColumn("event_date", F.coalesce("event_date", "first_settlement_date"))
     result = result.withColumn(
         "variance", (F.coalesce("paid_amount", F.lit(0)) - F.coalesce("net_payable", F.lit(0))).cast(DECIMAL)
     )
@@ -234,4 +249,17 @@ def vendor_summary(df):
         F.sum("net_payable").alias("expected_amount"),
         F.sum("paid_amount").alias("paid_amount"),
         F.sum("variance").alias("variance"),
+    )
+
+
+def month_end_summary(df):
+    return (
+        df.withColumn("accounting_month", F.date_format(F.to_date("event_date"), "yyyy-MM"))
+        .groupBy("accounting_month", "vendor_id", "currency", "status")
+        .agg(
+            F.count("record_id").alias("record_count"),
+            F.sum("net_payable").alias("expected_amount"),
+            F.sum("paid_amount").alias("paid_amount"),
+            F.sum("variance").alias("variance"),
+        )
     )

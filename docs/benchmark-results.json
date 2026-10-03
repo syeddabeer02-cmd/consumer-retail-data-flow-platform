@@ -1,0 +1,40 @@
+{
+  "requested_funding_rows": 100000,
+  "generation_seconds": 2.96,
+  "pipeline_seconds": 31.9,
+  "input_rows": 210003,
+  "funding_rows_per_second": 3134.8,
+  "output_bytes": 20189405,
+  "cpu_count": 9,
+  "sampled_peak_process_tree_rss_bytes": null,
+  "memory_measurement": "Linux /proc RSS sampled every 0.2s; shared pages may be counted more than once",
+  "python": "3.12.14",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+  "master": "local[2]",
+  "format": "parquet",
+  "run_id": "fe30e53ba713438d910c6ce9ebf28bce",
+  "quality": {
+    "funding": {
+      "input": 100002,
+      "valid": 100000,
+      "quarantined": 1,
+      "duplicate_versions": 1
+    },
+    "payouts": {
+      "input": 110001,
+      "valid": 110001,
+      "quarantined": 0,
+      "duplicate_versions": 0
+    }
+  },
+  "reconciliation": {
+    "AMOUNT_MISMATCH": 5000,
+    "MISSING_PAYOUT": 5000,
+    "REVERSED": 5000,
+    "MATCHED": 80000,
+    "CONTRA": 5000,
+    "ORPHAN_PAYOUT": 1
+  },
+  "note": "Measured on this runtime; not evidence of a 50M-record production SLA",
+  "seed": 42
+}

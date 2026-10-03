@@ -18,6 +18,18 @@ x-airflow: &airflow
     postgres:
       condition: service_healthy
 services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.dashboard
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - retail-data:/opt/airflow/data:ro
+    ports: ['127.0.0.1:8501:8501']
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8501/health', timeout=5)"]
+      interval: 15s
+      retries: 5
   pipeline:
     security_opt: [no-new-privileges:true]
     profiles: [demo]

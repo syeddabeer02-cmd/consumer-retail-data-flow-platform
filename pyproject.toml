@@ -3,15 +3,19 @@ requires = ["setuptools>=75"]
 build-backend = "setuptools.build_meta"
 [project]
 name = "consumer-retail-data-flow-platform"
-version = "0.2.0"
+version = "0.3.0"
 description = "Synthetic retail funding and bank payout lakehouse"
 requires-python = ">=3.10,<3.13"
 dependencies = []
 [project.optional-dependencies]
+dashboard = ["duckdb==1.4.3"]
 spark = ["pyspark==3.5.3", "delta-spark==3.2.1"]
 dev = ["pytest==8.3.5", "ruff==0.11.13"]
 [project.scripts]
 retail-flow = "retail_flow.cli:main"
+[tool.setuptools.package-data]
+retail_flow = ["dashboard_assets/*"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 [tool.pytest.ini_options]

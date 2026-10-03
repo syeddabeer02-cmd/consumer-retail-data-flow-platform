@@ -107,3 +107,20 @@ has not been performed here; no Azure resources are created by local commands.
 
 Uses synthetic retail data, with reproducible tests and documented benchmark
 results.
+
+## Visual dashboard
+
+The read-only dashboard displays the latest successful Parquet ledger at
+http://localhost:8501. It refreshes every 15 seconds after a new snapshot is
+published. Views cover reconciliation, funding calculations, bank payouts,
+exceptions, month-end results and quarantined records. Search or filter by
+vendor/status, then click a record ID for its funding and payment history.
+
+For an existing Docker installation, keep your data and start the dashboard:
+
+```powershell
+git pull
+docker compose up --build -d dashboard
+```
+
+See [the dashboard walkthrough](docs/dashboard.md) for the late-payment scenario.

@@ -19,7 +19,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - run: pip install -e '.[spark,dev]'
+      - run: pip install -e '.[spark,dashboard,dev]'
       - run: python -m ruff check src tests dags databricks
       - run: python -m pytest -q
         env:
@@ -48,9 +48,52 @@ jobs:
       - run: python -m retail_flow.cli health
       - run: python -m retail_flow.cli retain --days 30
       - run: python -m retail_flow.cli benchmark --root data/ci-benchmark --date 2026-10-01 --rows 10000
-      - run: docker compose --env-file .env.example up -d --build --wait --wait-timeout 180 airflow-webserver airflow-scheduler
+      - run: docker compose --env-file .env.example up -d --build --wait --wait-timeout 180 airflow-webserver airflow-scheduler dashboard
       - run: docker compose --env-file .env.example exec -T airflow-scheduler airflow dags test retail_synthetic_demo 2026-10-01
       - run: docker compose --env-file .env.example exec -T airflow-scheduler python -m retail_flow.cli health --root /opt/airflow/data
+      - name: Verify dashboard over published Compose data
+        run: |
+          python - <<'PY'
+          import json
+          from urllib.request import urlopen
+          base = 'http://127.0.0.1:8501'
+          with urlopen(base + '/api/summary') as response:
+              summary = json.load(response)
+          assert summary['quality_gates']['checks'] == 'PASSED'
+          assert summary['counts']['gold_funding'] > 0
+          with urlopen(base + '/api/table?dataset=reconciliation') as response:
+              assert json.load(response)['total'] > 0
+          PY
+      - name: Browser dashboard smoke test
+        run: |
+          pip install playwright==1.58.0
+          python -m playwright install --with-deps chromium
+          python - <<'PY'
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              browser = p.chromium.launch()
+              page = browser.new_page(viewport={'width': 1440, 'height': 1000})
+              errors = []
+              page.on('pageerror', lambda error: errors.append(str(error)))
+              page.goto('http://127.0.0.1:8501')
+              page.locator('.record-link').first.wait_for()
+              assert page.locator('.metric').count() == 4
+              page.locator('.record-link').first.click()
+              page.locator('dialog[open]').wait_for()
+              assert 'Funding calculation' in page.locator('#detail-body').inner_text()
+              page.locator('#close').click()
+              for dataset in ['funding', 'payouts', 'exceptions', 'monthly', 'quarantine']:
+                  with page.expect_response(lambda response: '/api/table?' in response.url and 'dataset=' + dataset in response.url) as result:
+                      page.locator('[data-dataset="' + dataset + '"]').click()
+                  assert result.value.status == 200
+              assert not errors, errors
+              page.screenshot(path='dashboard-preview.png', full_page=True)
+              browser.close()
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-preview
+          path: dashboard-preview.png
       - name: Compose logs on failure
         if: failure()
         run: docker compose --env-file .env.example logs --tail 100

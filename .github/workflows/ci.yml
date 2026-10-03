@@ -1,0 +1,41 @@
+name: Retail Data Platform CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: pip install -e '.[spark,dev]'
+      - run: python -m ruff check src tests dags databricks
+      - run: python -m pytest -q
+        env:
+          SPARK_LOCAL_IP: 127.0.0.1
+      - run: python -m retail_flow.cli demo --date 2026-10-01 --rows 40
+        env:
+          SPARK_LOCAL_IP: 127.0.0.1
+      - run: python -m retail_flow.cli demo --root data/delta --date 2026-10-01 --rows 20 --format delta
+        env:
+          SPARK_LOCAL_IP: 127.0.0.1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-audit
+          path: data/published/
+      - run: docker compose --env-file .env.example config -q
+      - run: docker build -f infrastructure/Dockerfile -t retail-flow:test .
+      - run: docker build -f infrastructure/Dockerfile.airflow -t retail-airflow:test .
+      - run: >-
+          docker run --rm --entrypoint python retail-airflow:test -c
+          "from airflow.models import DagBag; b = DagBag('/opt/airflow/dags', include_examples=False); assert not b.import_errors, b.import_errors; assert {'retail_funding_daily', 'retail_synthetic_demo'} <= set(b.dags)"
+      - run: docker run --rm retail-flow:test demo --date 2026-10-01 --rows 20

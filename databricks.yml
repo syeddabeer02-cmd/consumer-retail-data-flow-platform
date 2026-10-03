@@ -1,0 +1,44 @@
+bundle:
+  name: consumer-retail-data-flow-platform
+variables:
+  catalog:
+    description: Target Unity Catalog catalog
+  schema:
+    default: retail_flow
+  input_root:
+    description: UC external volume path backed by ADLS Gen2
+  cluster_id:
+    description: Existing Unity Catalog enabled Databricks cluster ID
+artifacts:
+  retail_flow:
+    type: whl
+    build: python -m pip wheel --no-deps --wheel-dir dist .
+    path: .
+resources:
+  jobs:
+    retail_funding:
+      name: consumer-retail-funding-reconciliation
+      max_concurrent_runs: 1
+      timeout_seconds: 14400
+      parameters:
+        - name: batch_date
+          default: '2026-10-01'
+      tasks:
+        - task_key: funding_and_reconciliation
+          existing_cluster_id: ${var.cluster_id}
+          spark_python_task:
+            python_file: ./databricks/run_job.py
+            parameters:
+              - --input-root
+              - ${var.input_root}
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}
+              - --date
+              - '{{job.parameters.batch_date}}'
+          libraries:
+            - whl: ./dist/*.whl
+          max_retries: 2
+          min_retry_interval_millis: 120000
+          timeout_seconds: 14400

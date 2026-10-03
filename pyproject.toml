@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "consumer-retail-data-flow-platform"
+version = "0.1.0"
+description = "Synthetic retail funding and bank payout lakehouse"
+requires-python = ">=3.10,<3.13"
+dependencies = []
+[project.optional-dependencies]
+spark = ["pyspark==3.5.3", "delta-spark==3.2.1"]
+dev = ["pytest==8.3.5", "ruff==0.11.13"]
+[project.scripts]
+retail-flow = "retail_flow.cli:main"
+[tool.setuptools.packages.find]
+where = ["src"]
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+markers = ["spark: Spark integration tests"]
+[tool.ruff]
+line-length = 110

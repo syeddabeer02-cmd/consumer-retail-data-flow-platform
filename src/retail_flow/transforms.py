@@ -41,16 +41,41 @@ def validate(df, kind, batch_date):
             reasons.append(F.when(value.isNull() | (value < minimum), F.lit(f"invalid_{name}")))
         reasons.append(
             F.when(
-                F.col("quantity").cast("decimal(20,6)") != F.col("quantity").cast("int"),
-                F.lit("fractional_quantity"),
+                F.col("quantity").cast("int").isNull()
+                | (F.col("quantity").cast("decimal(20,6)") != F.col("quantity").cast("int"))
+                | (F.col("quantity").cast("int") > 100000),
+                F.lit("invalid_integer_quantity"),
             )
         )
         for name in RATES:
             value = F.col(name).cast("decimal(12,6)")
-            reasons.append(F.when(value.isNull() | (value < 0) | (value > 1), F.lit(f"invalid_{name}")))
+            reasons.append(
+                F.when(
+                    value.isNull()
+                    | (value < 0)
+                    | (value > 1)
+                    | (F.col(name).cast("decimal(38,18)") != value),
+                    F.lit(f"invalid_{name}"),
+                )
+            )
         reasons.append(F.when(F.col("adjustment").cast(DECIMAL).isNull(), F.lit("invalid_adjustment")))
     else:
         reasons.append(F.when(F.col("amount").cast(DECIMAL).isNull(), F.lit("invalid_amount")))
+    monetary_fields = (
+        ["unit_price", "logistics_per_unit", "penalty", "adjustment"] if kind == "funding" else ["amount"]
+    )
+    for name in monetary_fields:
+        precise = F.col(name).cast("decimal(38,18)")
+        value = F.col(name).cast(DECIMAL)
+        reasons.append(
+            F.when(
+                precise.isNull()
+                | value.isNull()
+                | (precise != value)
+                | (F.abs(precise) > F.lit("1000000000000").cast(DECIMAL)),
+                F.lit(f"invalid_money_precision_or_range_{name}"),
+            )
+        )
     checked = df.withColumn("quality_errors", F.concat_ws("|", *reasons))
     return checked.filter(F.col("quality_errors") == "").drop("quality_errors"), checked.filter(
         F.col("quality_errors") != ""

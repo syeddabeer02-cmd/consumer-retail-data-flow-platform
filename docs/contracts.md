@@ -3,8 +3,11 @@
 Policy: `synthetic-v1`. Currency: INR only. Rates are fractions from 0 through 1.
 Each batch contains only its event date in ISO YYYY-MM-DD form. Timestamps must
 parse as timestamps. CSV headers must match the fields in `synthetic.py` exactly.
-Identifiers are mandatory; quantity is a positive integer; unit price, logistics
-and penalty are nonnegative. Adjustment may be signed. Invalid rows quarantine.
+Identifiers are mandatory; quantity is a positive integer at most 100,000; unit price, logistics
+and penalty are nonnegative. Adjustment may be signed. Monetary inputs must have
+cent precision and absolute value at most INR 1 trillion; rates have at most six
+fractional digits. These bounds prevent silent rounding or overflow in the daily
+calculation contract. Invalid rows quarantine.
 Malformed CSV or unexpected headers fail the batch. Valid record versions resolve
 by latest updated_at then a deterministic row hash. Record IDs and payout IDs
 are globally unique logical identifiers within the daily source snapshot.

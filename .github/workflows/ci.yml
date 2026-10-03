@@ -39,3 +39,7 @@ jobs:
           docker run --rm --entrypoint python retail-airflow:test -c
           "from airflow.models import DagBag; b = DagBag('/opt/airflow/dags', include_examples=False); assert not b.import_errors, b.import_errors; assert {'retail_funding_daily', 'retail_synthetic_demo'} <= set(b.dags)"
       - run: docker run --rm retail-flow:test demo --date 2026-10-01 --rows 20
+      - run: >-
+          docker run --rm --entrypoint /bin/bash
+          -e AIRFLOW__CORE__EXECUTOR=SequentialExecutor retail-airflow:test -c
+          "airflow db migrate && airflow dags test retail_synthetic_demo 2026-10-01"

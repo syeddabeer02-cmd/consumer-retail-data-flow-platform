@@ -2,6 +2,7 @@
 
 Local environment: Python 3.12.14, OpenJDK 17, PySpark 3.5.3.
 
+- Eight local tests pass, including precision/range contract checks.
 - Decimal reference tests pass, including exact accounting identity and cent rounding.
 - Shared Spark tests pass across 35 measures, latest-version selection, quarantine,
   explicit reversals, orphan/missing payouts, contra pairs, split payouts,
@@ -12,11 +13,13 @@ Local environment: Python 3.12.14, OpenJDK 17, PySpark 3.5.3.
 
 Delta local execution was attempted but the environment could not resolve
 `repo1.maven.org` or `repos.spark-packages.org` to download Delta JVM jars.
-The Parquet path ran successfully. CI includes Delta execution on its runner.
+The Parquet path ran successfully locally. GitHub CI subsequently executed the
+Delta batch successfully on its runner.
 
-Docker is not installed in this execution environment. Container builds,
-Airflow DAG import checks and Compose configuration validation are included in
-GitHub Actions and must be judged from the actual workflow result.
+Docker is not installed in this execution environment. GitHub CI subsequently
+validated Compose configuration, built both container images and imported both
+Airflow DAGs successfully. CI also executes the standalone pipeline container
+and the synthetic Airflow DAG. The linked workflow is the authoritative result.
 Azure Databricks and ADLS have not been deployed or exercised. The shared
 transformation logic is validated locally; cloud integration remains a separate
 workspace validation step. No 50M-row benchmark or production SLA is claimed.

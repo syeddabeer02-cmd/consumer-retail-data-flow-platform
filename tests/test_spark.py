@@ -86,3 +86,18 @@ def test_contra_split_tolerance_and_duplicate_reversal(spark):
     }
     assert rows["C"].contra_pair_count == 1
     assert len(rows["C"].contra_pair_ids) == 1
+
+
+def test_precision_and_quantity_contract(spark, tmp_path):
+    folder = generate(tmp_path, "2026-10-01", 20)
+    with (folder / "funding.csv").open() as handle:
+        base = next(csv.DictReader(handle))
+    rows = [
+        dict(base, record_id="CENT", unit_price="1.005"),
+        dict(base, record_id="BIG", quantity="2147483648"),
+        dict(base, record_id="RATE", commission_rate="0.1234567"),
+        dict(base, record_id="VALID", unit_price="1.01"),
+    ]
+    good, bad = validate(spark.createDataFrame(rows), "funding", "2026-10-01")
+    assert good.select("record_id").first().record_id == "VALID"
+    assert {r.record_id for r in bad.select("record_id").collect()} == {"CENT", "BIG", "RATE"}

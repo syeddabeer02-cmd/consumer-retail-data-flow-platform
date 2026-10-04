@@ -61,7 +61,7 @@ cp .env.example .env
 docker compose up --build -d
 ```
 
-Open http://localhost:8080 and sign in as `admin` with your chosen password.
+Open http://localhost:8081 and sign in as `admin` with your chosen password.
 Trigger `retail_synthetic_demo`; the daily and retention DAGs start paused.
 Unpause daily processing after setting up finalized daily source partitions.
 The daily DAG retries twice and limits processing to four hours. Retention

@@ -24,7 +24,7 @@ docker compose ps
 ```
 
 The first build downloads dependencies and may take several minutes. Compose
-initializes PostgreSQL and the Airflow admin account. Visit localhost:8080,
+initializes PostgreSQL and the Airflow admin account. Visit localhost:8081,
 log in as admin, and trigger retail_synthetic_demo. Its task log shows the
 quality counts, as-of ledger output paths and reconciliation distribution.
 The task creates synthetic funding/payout data; it uses no employer/customer data.

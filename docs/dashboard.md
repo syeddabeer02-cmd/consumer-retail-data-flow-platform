@@ -3,7 +3,7 @@
 Open http://localhost:8501 after `docker compose up --build -d dashboard`.
 The service mounts the existing retail-data volume read-only at the same path
 used by Airflow. It requires neither a new Spark job nor a regenerated demo.
-Airflow workflow monitoring remains at http://localhost:8080.
+Airflow workflow monitoring remains at http://localhost:8081.
 
 The overview shows current funding, matched payments, exceptions, expected and
 paid totals, outcome counts, quality gates and audit lineage. Six table views

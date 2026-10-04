@@ -12,7 +12,7 @@ an ARM server. No cloud resources are created by these files.
    billing limits and available capacity before creating resources.
 2. Point a public hostname's DNS A record at that server. Remove an incorrect
    AAAA record if the server has no working IPv6 route.
-3. Allow inbound TCP 80/443. Restrict SSH access. Keep 5432, 8080 and 8501 closed
+3. Allow inbound TCP 80/443. Restrict SSH access. Keep 5432, 8081 and 8501 closed
    publicly; local host bindings in Compose remain unchanged.
 4. Clone this repository on the server and create `.env` from `.env.example`.
    Replace all example secrets; add `DASHBOARD_DOMAIN=your-hostname` and
@@ -53,12 +53,12 @@ docker compose restart dashboard
 Access Airflow through an SSH tunnel from Windows:
 
 ```powershell
-ssh -L 8080:127.0.0.1:8080 YOUR_USER@YOUR_SERVER
+ssh -L 8081:127.0.0.1:8081 YOUR_USER@YOUR_SERVER
 ```
 
-While the tunnel is open, use http://localhost:8080 and the server's Airflow
-credentials. If local Airflow already uses port 8080, use
-`-L 18080:127.0.0.1:8080` and http://localhost:18080 instead.
+While the tunnel is open, use http://localhost:8081 and the server's Airflow
+credentials. If local Airflow already uses port 8081, use
+`-L 18080:127.0.0.1:8081` and http://localhost:18080 instead.
 
 Only publish synthetic data. The dashboard exposes financial rows and source
 hashes without login and is intended as a public portfolio demonstration.

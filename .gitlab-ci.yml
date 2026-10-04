@@ -1,0 +1,24 @@
+# Optional GitLab execution; GitHub Actions remains the primary verified CI.
+image: python:3.12-bookworm
+stages: [validate]
+variables:
+  SPARK_LOCAL_IP: '127.0.0.1'
+validate:
+  stage: validate
+  timeout: 20m
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends openjdk-17-jre-headless procps
+    - python -m pip install -e '.[spark,dashboard,dev]'
+  script:
+    - python -m ruff check src tests dags databricks scripts
+    - python -m pytest -q --junitxml=test-results.xml
+    - python -m retail_flow.cli demo --root data/gitlab --date 2026-10-03 --rows 20
+    - python scripts/verify_scenarios.py --root data/gitlab
+  artifacts:
+    when: always
+    expire_in: 7 days
+    reports:
+      junit: test-results.xml
+    paths:
+      - data/gitlab/published/

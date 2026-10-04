@@ -20,11 +20,14 @@ jobs:
           distribution: temurin
           java-version: '17'
       - run: pip install -e '.[spark,dashboard,dev]'
-      - run: python -m ruff check src tests dags databricks
+      - run: python -m ruff check src tests dags databricks scripts
       - run: python -m pytest -q
         env:
           SPARK_LOCAL_IP: 127.0.0.1
       - run: python -m retail_flow.cli demo --date 2026-10-01 --rows 40
+        env:
+          SPARK_LOCAL_IP: 127.0.0.1
+      - run: python scripts/verify_scenarios.py --root data
         env:
           SPARK_LOCAL_IP: 127.0.0.1
       - run: python -m retail_flow.cli demo --root data/delta --date 2026-10-01 --rows 20 --format delta
@@ -35,6 +38,13 @@ jobs:
           name: pipeline-audit
           path: data/published/
       - run: docker compose --env-file .env.example config -q
+      - name: Validate hosted deployment configuration
+        run: |
+          docker compose --env-file .env.example -f compose.yaml -f compose.hosted.yaml config -q
+          docker run --rm -e DASHBOARD_DOMAIN=retail.example.com -e ACME_EMAIL=demo@example.com -v "$PWD/infrastructure/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+        env:
+          DASHBOARD_DOMAIN: retail.example.com
+          ACME_EMAIL: demo@example.com
       - run: docker build -f infrastructure/Dockerfile -t retail-flow:test .
       - run: docker build -f infrastructure/Dockerfile.airflow -t retail-airflow:test .
       - run: >-

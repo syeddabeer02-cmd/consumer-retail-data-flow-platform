@@ -1,7 +1,7 @@
 # Deployment security
 
-Local Compose is a development deployment. Only the Airflow UI binds a host
-port, on 127.0.0.1. PostgreSQL and scheduler have no published host ports.
+Local Compose is a development deployment. Airflow and the dashboard bind host
+ports on 127.0.0.1. PostgreSQL and scheduler have no published host ports.
 Secrets come from an ignored .env file. The example file is for local testing;
 replace every example value. Do not expose the development UI publicly.
 Use a dedicated Docker volume and project checkout. Docker containers use a
@@ -28,3 +28,6 @@ CI has read-only repository token permissions. Secret files, raw/generated data,
 warehouse files and virtual environments are ignored by Git. Cloud deployment
 requires your actual workspace validation; this file describes the implemented
 controls and configuration, not a security certification.
+
+The optional hosted overlay routes only the synthetic-data dashboard over HTTPS.
+Airflow remains accessible via SSH tunnel. See hosting.md for deployment scope.

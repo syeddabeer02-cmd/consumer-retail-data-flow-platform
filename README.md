@@ -124,3 +124,15 @@ docker compose up --build -d dashboard
 ```
 
 See [the dashboard walkthrough](docs/dashboard.md) for the late-payment scenario.
+
+## Deployment preparation and repeatable checks
+
+[Hosting instructions](docs/hosting.md) describe the HTTPS Docker overlay for a
+Linux portfolio server. [Remaining steps](docs/next-steps.md) record local
+validation and the account-dependent deployment tasks.
+
+Repeat the replay/accounting/failure-protection checks on your existing ledger:
+
+```powershell
+Get-Content -Raw scripts/verify_scenarios.py | docker compose exec -T airflow-scheduler python - --root /opt/airflow/data
+```

@@ -1,0 +1,30 @@
+# Use with compose.yaml. Only the dashboard is publicly routed.
+services:
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DASHBOARD_DOMAIN: ${DASHBOARD_DOMAIN:?Set your public dashboard hostname}
+      ACME_EMAIL: ${ACME_EMAIL:?Set your certificate contact email}
+    ports: ['80:80', '443:443']
+    volumes:
+      - ./infrastructure/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      dashboard:
+        condition: service_healthy
+    security_opt: [no-new-privileges:true]
+  dashboard:
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1.0
+  postgres:
+    restart: unless-stopped
+  airflow-webserver:
+    restart: unless-stopped
+  airflow-scheduler:
+    restart: unless-stopped
+volumes:
+  caddy-data:
+  caddy-config:

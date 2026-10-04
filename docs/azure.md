@@ -51,3 +51,30 @@ to reclaim physically obsolete files. The preview job never deletes data.
 Existing tables from the original daily-only schema should use a fresh target
 schema for this expanded snapshot schema; do not enable uncontrolled schema
 merge over an old accounting contract.
+
+## Explicit ADLS output placement
+
+The job writes Unity Catalog managed Delta tables. The source external volume
+alone does not determine output storage: output follows the target schema's
+managed storage configuration. To place outputs in your project ADLS account,
+have the storage administrator create a fresh schema before the first job:
+
+```sql
+CREATE SCHEMA YOUR_CATALOG.retail_flow
+MANAGED LOCATION 'abfss://YOUR_CONTAINER@YOUR_ACCOUNT.dfs.core.windows.net/retail-managed';
+DESCRIBE SCHEMA EXTENDED YOUR_CATALOG.retail_flow;
+```
+
+The path must be covered by the configured external location. The provisioning
+identity needs CREATE SCHEMA/USE CATALOG and CREATE MANAGED STORAGE on that
+external location. Keep this managed path separate from the source external
+volume path; do not register overlapping storage. An existing schema's location
+is not changed by CREATE SCHEMA IF NOT EXISTS in the job.
+Grant the job identity USE CATALOG, USE SCHEMA, CREATE TABLE, SELECT and MODIFY
+as needed for its tables, views and append operations. Creating/replacing the
+reporting view requires the relevant schema privileges and view ownership.
+Validate table locations and one complete job in the actual workspace before
+calling Azure integration complete. Delta stores its data in Parquet with a
+transaction log; the dashboard continues to read the local Parquet workflow.
+
+Reference: https://learn.microsoft.com/en-us/azure/databricks/sql/language-manual/sql-ref-syntax-ddl-create-schema
